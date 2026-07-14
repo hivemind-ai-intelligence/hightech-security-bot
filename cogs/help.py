@@ -34,6 +34,7 @@ class Help(commands.Cog):
             "backup": "💾 Backup",
             "server_config": "⚙️ Server Config",
             "admin": "⚙️ Admin",
+            "music": "🎵 Music",
         }
 
         if category and category.lower() in cats:
@@ -57,6 +58,7 @@ class Help(commands.Cog):
         embed.add_field(name="💾 Backup (4)", value="`backup_roles` `backup_channels` `backup_full` `backup_list`", inline=False)
         embed.add_field(name="⚙️ Config (6)", value="`setup` `config_view` `config_channel` `config_role` `config_reset` `invite_info`", inline=False)
         embed.add_field(name="⚙️ Admin (5)", value="`ping` `status` `reload` `cogs` `invite` `servers` `help`", inline=False)
+        embed.add_field(name="🎵 Music (29)", value="`play` `search` `skip` `forceskip` `pause` `resume` `stop` `queue` `loop` `shuffle` `volume` `bassboost` `nightcore` `autoplay` `seek` `restart` `remove` `clearqueue` `move` `history` `replay` `playnext` `play_now` `nowplaying` `lyrics` `music_help` `247` `dj` `disconnect`", inline=False)
 
         embed.set_footer(text="🦇 𝕳𝖎-𝕿𝖊𝖈𝖍 𝕾𝖊𝖈𝖚𝖗𝖎𝖙𝖞 • 42+ Global Commands • Use /bot_help • Works on ANY server!")
         await ctx.send(embed=embed)
@@ -67,7 +69,7 @@ class Help(commands.Cog):
             "verification": "Verification", "threat_intel": "ThreatIntel",
             "incident_alerts": "IncidentAlerts", "anti_raid": "AntiRaid",
             "reports": "Reports", "backup": "Backup",
-            "server_config": "ServerConfig", "admin": "Admin",
+            "server_config": "ServerConfig", "admin": "Admin", "music": "Music",
         }
         cog = self.bot.get_cog(cog_map.get(category, ""))
         if not cog:
