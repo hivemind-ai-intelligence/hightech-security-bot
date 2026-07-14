@@ -166,13 +166,27 @@ class Music(commands.Cog):
                 if fmt.get("acodec") != "none" and fmt.get("url"):
                     stream_url = fmt["url"]; break
         if not stream_url: return None
-        ffmpeg_opts = {"before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5", "options": "-vn"}
+        # Use FFmpegPCMAudio with reconnect and volume via -af
+        ffmpeg_opts = {
+            "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -nostdin",
+            "options": "-vn"
+        }
         vol = state.volume
-        if state.bass_boost: ffmpeg_opts["options"] += f' -af "volume={vol},bass=g=10:f=110"'
-        elif state.nightcore: ffmpeg_opts["options"] += f' -af "volume={vol},asetrate=44100*1.25,atempo=1.25"'
-        else: ffmpeg_opts["options"] += f' -af "volume={vol}"'
-        try: return discord.FFmpegPCMAudio(stream_url, **ffmpeg_opts)
-        except: return None
+        if state.bass_boost:
+            ffmpeg_opts["options"] += f" -af volume={vol},bass=g=10:f=110"
+        elif state.nightcore:
+            ffmpeg_opts["options"] += f" -af volume={vol},asetrate=44100*1.25,atempo=1.25"
+        else:
+            ffmpeg_opts["options"] += f" -af volume={vol}"
+        try:
+            return discord.FFmpegPCMAudio(stream_url, **ffmpeg_opts)
+        except Exception as e:
+            logger.error(f"FFmpeg source error: {e}")
+            # Fallback: try without volume filter
+            try:
+                return discord.FFmpegPCMAudio(stream_url, before_options="-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -nostdin", options="-vn")
+            except:
+                return None
 
     async def _play_next(self, guild: discord.Guild):
         state = self._get_state(guild.id)
