@@ -1,14 +1,11 @@
 services:
   - type: web
     name: hightech-security-bot
-    env: python
-    region: singapore
+    env: docker
+    region: oregon
     plan: free
-    buildCommand: |
-      apt-get update -qq
-      apt-get install -y -qq ffmpeg libsodium-dev 2>/dev/null || true
-      pip install -r requirements.txt
-    startCommand: python bot.py
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
     envVars:
       - key: DISCORD_BOT_TOKEN
         sync: false
@@ -16,4 +13,5 @@ services:
         value: "!"
       - key: LOG_LEVEL
         value: INFO
-    autoDeploy: true
+      - key: PORT
+        value: "8080"
