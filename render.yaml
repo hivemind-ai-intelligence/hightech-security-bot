@@ -1,0 +1,19 @@
+# ────────────────────────────────────────────────────────────
+# 🦇 𝕳𝖎-𝕿𝖊𝖈𝖍 𝕾𝖊𝖈𝖚𝖗𝖎𝖙𝖞 — Render Deployment Config
+# ────────────────────────────────────────────────────────────
+
+services:
+  - type: web
+    name: hightech-security-bot
+    env: python
+    region: singapore
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
+    envVars:
+      - key: DISCORD_BOT_TOKEN
+        sync: false
+      - key: BOT_PREFIX
+        value: "!"
+      - key: LOG_LEVEL
+        value: INFO
