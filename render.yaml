@@ -1,11 +1,12 @@
 services:
   - type: web
     name: hightech-security-bot
-    env: docker
+    env: python
     region: oregon
     plan: free
-    dockerfilePath: ./Dockerfile
-    autoDeploy: true
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
+    autoDeploy: false
     envVars:
       - key: DISCORD_BOT_TOKEN
         sync: false
@@ -13,5 +14,3 @@ services:
         value: "!"
       - key: LOG_LEVEL
         value: INFO
-      - key: PORT
-        value: "8080"
