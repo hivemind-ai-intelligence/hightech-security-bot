@@ -1,24 +1,26 @@
 #!/bin/bash
-# 🦇 Hi-Tech Security Bot Start Script
-# Installs FFmpeg if missing, then starts the bot
+# 🦇 Hi-Tech Security Bot — Render Start Script
 
-echo "🦇 Hi-Tech Security Bot — Starting..."
+echo "🦇 Starting Hi-Tech Security Bot..."
 
-# Install FFmpeg if not present
-if ! command -v ffmpeg &> /dev/null; then
+# Install system deps if missing
+if ! command -v ffmpeg &>/dev/null; then
     echo "📦 Installing FFmpeg..."
-    apt-get update -qq && apt-get install -y -qq ffmpeg 2>/dev/null || {
-        # Fallback: download static build
-        echo "⚠️ apt-get failed, downloading static FFmpeg..."
-        curl -sL https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz -o /tmp/ffmpeg.tar.xz
-        cd /tmp && tar -xf ffmpeg.tar.xz
-        cp ffmpeg-*-static/ffmpeg ffmpeg-*-static/ffprobe /usr/local/bin/ 2>/dev/null
-    }
-    echo "✅ FFmpeg: $(ffmpeg -version 2>&1 | head -1)"
-else
-    echo "✅ FFmpeg found: $(ffmpeg -version 2>&1 | head -1)"
+    apt-get update -qq && apt-get install -y -qq ffmpeg 2>/dev/null || true
 fi
 
-# Start the bot
-echo "🚀 Starting bot..."
-exec python bot.py
+# Check libsodium (needed for davey/voice)
+python3 -c "import ctypes; ctypes.cdll.LoadLibrary('libsodium.so.23')" 2>/dev/null || {
+    echo "📦 Installing libsodium..."
+    apt-get install -y -qq libsodium23 libsodium-dev 2>/dev/null || true
+}
+
+echo "✅ FFmpeg: $(ffmpeg -version 2>&1 | head -1 || echo 'MISSING')"
+echo "✅ Python: $(python3 --version)"
+
+# Check voice support
+python3 -c "import davey; print('✅ davey OK')" 2>/dev/null || echo "⚠️ davey missing"
+python3 -c "import PyNaCl; print('✅ PyNaCl OK')" 2>/dev/null || echo "⚠️ PyNaCl missing"
+
+echo "🚀 Launching bot..."
+exec python3 bot.py
