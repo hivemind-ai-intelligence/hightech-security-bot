@@ -1,55 +1,31 @@
 """
 🦇 𝕳𝖎-𝕿𝖊𝖈𝖍 𝕾𝖊𝖈𝖚𝖗𝖎𝖙𝖞 Discord Bot — Main Entry Point
-Global bot — works on ANY Discord server without hardcoded IDs.
-64+ Security Commands + 29 Music Commands = 93+ total.
+Global bot — 64+ Security + 29 Music Commands
 """
 
 import asyncio
 import logging
 import os
 import sys
-import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
+import traceback
 from pathlib import Path
 
 import discord
 from discord.ext import commands
 
-from config.settings import config
-
-# ── Logging Setup ───────────────────────────────────────────
+# ── Logging ─────────────────────────────────────────────────
 Path("data").mkdir(exist_ok=True)
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
 logging.basicConfig(
-    level=getattr(logging, config.log_level),
+    level=getattr(logging, LOG_LEVEL, logging.INFO),
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    handlers=[
-        logging.FileHandler(config.log_file, encoding="utf-8"),
-        logging.StreamHandler(sys.stdout),
-    ],
+    handlers=[logging.StreamHandler(sys.stdout)],
 )
+logger = logging.getLogger("hightech-bot")
 
-logger = logging.getLogger("hightech-security-bot")
-
-
-# ── Health Check Server (Render needs port binding) ──────────
-class HealthHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b'OK')
-    def log_message(self, *args):
-        pass  # silent
-
-def start_health_server():
-    port = int(os.getenv("PORT", "8080"))
-    try:
-        server = HTTPServer(("0.0.0.0", port), HealthHandler)
-        logger.info(f"💚 Health server on port {port}")
-        server.serve_forever()
-    except Exception as e:
-        logger.warning(f"Health server failed: {e}")
-
+# ── Load settings ──────────────────────────────────────────
+from config.settings import config
 
 # ── Bot Setup ───────────────────────────────────────────────
 class SecurityBot(commands.Bot):
@@ -59,109 +35,67 @@ class SecurityBot(commands.Bot):
             command_prefix=commands.when_mentioned_or(config.bot_prefix),
             intents=intents,
             case_insensitive=True,
-            description="🦇 𝕳𝖎-𝕿𝖊𝖈𝖍 𝕾𝖊𝖈𝖚𝖗𝖎𝖙𝖞 — 93+ Global Commands",
         )
 
     async def setup_hook(self):
-        """Load all 13 cogs and sync global slash commands."""
-        cog_files = [
-            "cogs.moderation",
-            "cogs.automod",
-            "cogs.verification",
-            "cogs.threat_intel",
-            "cogs.incident_alerts",
-            "cogs.audit_logging",
-            "cogs.anti_raid",
-            "cogs.admin",
-            "cogs.help",
-            "cogs.music",
-            "cogs.reports",
-            "cogs.backup",
-            "cogs.server_config",
+        """Load cogs and sync commands."""
+        cogs = [
+            "cogs.moderation", "cogs.automod", "cogs.verification",
+            "cogs.threat_intel", "cogs.incident_alerts", "cogs.audit_logging",
+            "cogs.anti_raid", "cogs.admin", "cogs.help", "cogs.music",
+            "cogs.reports", "cogs.backup", "cogs.server_config",
         ]
-        loaded = 0
-        for cog in cog_files:
+        ok = 0
+        for c in cogs:
             try:
-                await self.load_extension(cog)
-                loaded += 1
-                logger.info(f"✓ {cog}")
+                await self.load_extension(c)
+                ok += 1
+                logger.info(f"  ✓ {c}")
             except Exception as e:
-                logger.error(f"✗ {cog}: {e}")
-
-        logger.info(f"📦 {loaded}/{len(cog_files)} cogs loaded, {len(self.cogs)} in registry")
-
-        # Sync global slash commands
+                logger.error(f"  ✗ {c}: {e}")
+                traceback.print_exc()
+        
+        logger.info(f"📦 {ok}/{len(cogs)} cogs loaded")
+        
+        # Sync — Discord rate limits, so we just queue it
         try:
-            synced = await self.tree.sync()
-            # Count all commands across cogs
-            total = sum(1 for c in self.tree.get_commands())
-            logger.info(f"🔄 Synced {len(synced)} slash commands ({total} total)")
+            await self.tree.sync()
+            total = len(self.tree.get_commands())
+            logger.info(f"🔄 {total} commands synced globally")
         except Exception as e:
-            logger.error(f"✗ Sync failed: {e}")
+            logger.warning(f"Sync delayed (rate limit): {e}")
 
     async def on_ready(self):
-        total_cmds = sum(1 for c in self.tree.get_commands())
-        logger.info(f"🦇 {self.user} (ID: {self.user.id}) ONLINE")
-        logger.info(f"   Servers: {len(self.guilds)} | Users: {sum(g.member_count for g in self.guilds)}")
-        logger.info(f"   Commands: {total_cmds} global | Cogs: {len(self.cogs)}")
+        total = len(self.tree.get_commands())
+        logger.info(f"🦇 ONLINE as {self.user} ({self.user.id})")
+        logger.info(f"   Guilds: {len(self.guilds)} | Cogs: {len(self.cogs)} | Commands: {total}")
         await self.change_presence(
             activity=discord.Activity(
-                type=discord.ActivityType.listening,
-                name=f"🎵 /play | 🛡️ {total_cmds} commands",
+                type=discord.ActivityType.watching,
+                name=f"🦇 {total} commands | /bot_help",
             )
         )
 
-    async def on_guild_join(self, guild: discord.Guild):
-        logger.info(f"📥 Joined: {guild.name} ({guild.member_count} members)")
-        channel = guild.system_channel
-        if not channel:
-            perms = [c for c in guild.text_channels if c.permissions_for(guild.me).send_messages]
-            channel = perms[0] if perms else None
-        if channel:
-            embed = discord.Embed(
-                title="🦇 𝕳𝖎-𝕿𝖊𝖈𝖍 𝕾𝖊𝖈𝖚𝖗𝖎𝖙𝖞 — Activated",
-                description=(
-                    "**Enterprise Discord Security Bot** 🩸\n\n"
-                    "• `/bot_help` — All 93+ commands\n"
-                    "• `/music_help` — 29 music commands\n"
-                    "• `/play song` — YouTube music, no premium!\n"
-                    "• `/setup` — Auto-configuration\n\n"
-                    "🔐 Security + 🎵 Music — All in one!"
-                ),
-                color=config.theme_primary,
-            )
-            embed.set_footer(text="🦇 𝕳𝖎-𝕿𝖊𝖈𝖍 𝕾𝖊𝖈𝖚𝖗𝖎𝖙𝖞 • Works globally")
-            try: await channel.send(embed=embed)
-            except: pass
-
-
-# ── Run ─────────────────────────────────────────────────────
+# ── Main ────────────────────────────────────────────────────
 if __name__ == "__main__":
-    if not config.bot_token:
-        logger.critical("DISCORD_BOT_TOKEN not set!")
+    token = config.bot_token or os.getenv("DISCORD_BOT_TOKEN", "")
+    if not token:
+        logger.critical("❌ DISCORD_BOT_TOKEN not set!")
         sys.exit(1)
 
-    # Start health server in background (for Render)
-    threading.Thread(target=start_health_server, daemon=True).start()
+    logger.info(f"🔑 Token found ({len(token)} chars)")
+    logger.info(f"🐍 Python {sys.version.split()[0]} | discord.py {discord.__version__}")
 
-    # Diagnose voice support
+    # Diagnose
     try:
-        import davey
-        logger.info(f"🔊 Voice: davey {getattr(davey, '__version__', 'OK')}")
-    except ImportError:
-        logger.warning("⚠️ davey not installed — voice will error on /play")
-
+        import davey; logger.info("🔊 davey OK")
+    except: logger.warning("⚠️ no davey")
     try:
-        import nacl
-        logger.info(f"🔐 NaCl: v{nacl.__version__}")
-    except ImportError:
-        logger.warning("⚠️ PyNaCl not installed")
-
+        import yt_dlp; logger.info("🎵 yt-dlp OK")
+    except: logger.warning("⚠️ no yt-dlp")
     try:
-        import yt_dlp
-        logger.info(f"🎵 yt-dlp: v{yt_dlp.version.__version__}")
-    except ImportError:
-        logger.warning("⚠️ yt-dlp not installed")
+        import nacl; logger.info("🔐 PyNaCl OK")
+    except: logger.warning("⚠️ no PyNaCl")
 
     bot = SecurityBot()
-    bot.run(config.bot_token)
+    bot.run(token)
