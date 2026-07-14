@@ -51,6 +51,7 @@ class SecurityBot(commands.Bot):
             "cogs.anti_raid",
             "cogs.admin",
             "cogs.help",
+            "cogs.music",
             "cogs.reports",
             "cogs.backup",
             "cogs.server_config",
