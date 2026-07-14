@@ -4,8 +4,11 @@ services:
     env: python
     region: singapore
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: bash start.sh
+    buildCommand: |
+      apt-get update -qq
+      apt-get install -y -qq ffmpeg libsodium-dev 2>/dev/null || true
+      pip install -r requirements.txt
+    startCommand: python bot.py
     envVars:
       - key: DISCORD_BOT_TOKEN
         sync: false
@@ -13,3 +16,4 @@ services:
         value: "!"
       - key: LOG_LEVEL
         value: INFO
+    autoDeploy: true
