@@ -1,101 +1,64 @@
-"""
-🦇 𝕳𝖎-𝕿𝖊𝖈𝖍 𝕾𝖊𝖈𝖚𝖗𝖎𝖙𝖞 Discord Bot — Main Entry Point
-Global bot — 64+ Security + 29 Music Commands
-"""
-
-import asyncio
-import logging
-import os
-import sys
-import traceback
-from pathlib import Path
-
+"""🦇 Hi-Tech Security — Minimal Discord Bot"""
+import os, sys, logging, asyncio
 import discord
 from discord.ext import commands
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import threading
 
-# ── Logging ─────────────────────────────────────────────────
-Path("data").mkdir(exist_ok=True)
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+logging.basicConfig(level=logging.INFO, stream=sys.stdout, 
+    format="%(asctime)s [%(levelname)s] %(message)s")
+log = logging.getLogger("bot")
 
-logging.basicConfig(
-    level=getattr(logging, LOG_LEVEL, logging.INFO),
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)],
-)
-logger = logging.getLogger("hightech-bot")
+class H(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200); self.end_headers(); self.wfile.write(b"OK")
+    def log_message(self, *a): pass
 
-# ── Load settings ──────────────────────────────────────────
-from config.settings import config
+PORT = int(os.getenv("PORT","8080"))
+threading.Thread(target=lambda: HTTPServer(("0.0.0.0",PORT),H).serve_forever(), daemon=True).start()
+log.info(f"Health :{PORT}")
 
-# ── Bot Setup ───────────────────────────────────────────────
-class SecurityBot(commands.Bot):
+TOKEN = os.getenv("DISCORD_BOT_TOKEN","")
+PREFIX = os.getenv("BOT_PREFIX","!")
+if not TOKEN:
+    log.critical("NO TOKEN!"); sys.exit(1)
+
+class Bot(commands.Bot):
     def __init__(self):
-        intents = discord.Intents.all()
-        super().__init__(
-            command_prefix=commands.when_mentioned_or(config.bot_prefix),
-            intents=intents,
-            case_insensitive=True,
-        )
+        super().__init__(command_prefix=commands.when_mentioned_or(PREFIX), 
+                        intents=discord.Intents.all(), case_insensitive=True)
 
     async def setup_hook(self):
-        """Load cogs and sync commands."""
-        cogs = [
-            "cogs.moderation", "cogs.automod", "cogs.verification",
-            "cogs.threat_intel", "cogs.incident_alerts", "cogs.audit_logging",
-            "cogs.anti_raid", "cogs.admin", "cogs.help", "cogs.music",
-            "cogs.reports", "cogs.backup", "cogs.server_config",
-        ]
-        ok = 0
+        cogs = ["cogs.moderation","cogs.automod","cogs.verification","cogs.threat_intel",
+                "cogs.incident_alerts","cogs.audit_logging","cogs.anti_raid","cogs.admin",
+                "cogs.help","cogs.music","cogs.reports","cogs.backup","cogs.server_config"]
+        ok=0
         for c in cogs:
             try:
-                await self.load_extension(c)
-                ok += 1
-                logger.info(f"  ✓ {c}")
+                await self.load_extension(c); ok+=1
             except Exception as e:
-                logger.error(f"  ✗ {c}: {e}")
-                traceback.print_exc()
-        
-        logger.info(f"📦 {ok}/{len(cogs)} cogs loaded")
-        
-        # Sync — Discord rate limits, so we just queue it
+                log.error(f"Cog {c}: {e}")
+        log.info(f"Cogs: {ok}/{len(cogs)}")
         try:
             await self.tree.sync()
-            total = len(self.tree.get_commands())
-            logger.info(f"🔄 {total} commands synced globally")
+            log.info(f"Synced {len(self.tree.get_commands())} cmds")
         except Exception as e:
-            logger.warning(f"Sync delayed (rate limit): {e}")
+            log.warning(f"Sync defer: {e}")
 
     async def on_ready(self):
-        total = len(self.tree.get_commands())
-        logger.info(f"🦇 ONLINE as {self.user} ({self.user.id})")
-        logger.info(f"   Guilds: {len(self.guilds)} | Cogs: {len(self.cogs)} | Commands: {total}")
-        await self.change_presence(
-            activity=discord.Activity(
-                type=discord.ActivityType.watching,
-                name=f"🦇 {total} commands | /bot_help",
-            )
-        )
+        log.info(f"ONLINE: {self.user} | {len(self.guilds)} guilds | {len(self.tree.get_commands())} cmds")
+        await self.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="🦇 /bot_help"))
 
-# ── Main ────────────────────────────────────────────────────
-if __name__ == "__main__":
-    token = config.bot_token or os.getenv("DISCORD_BOT_TOKEN", "")
-    if not token:
-        logger.critical("❌ DISCORD_BOT_TOKEN not set!")
-        sys.exit(1)
+bot = Bot()
 
-    logger.info(f"🔑 Token found ({len(token)} chars)")
-    logger.info(f"🐍 Python {sys.version.split()[0]} | discord.py {discord.__version__}")
+@bot.event
+async def on_connect(): log.info("WS connected")
+@bot.event
+async def on_disconnect(): log.warning("WS disconnected")
 
-    # Diagnose
-    try:
-        import davey; logger.info("🔊 davey OK")
-    except: logger.warning("⚠️ no davey")
-    try:
-        import yt_dlp; logger.info("🎵 yt-dlp OK")
-    except: logger.warning("⚠️ no yt-dlp")
-    try:
-        import nacl; logger.info("🔐 PyNaCl OK")
-    except: logger.warning("⚠️ no PyNaCl")
-
-    bot = SecurityBot()
-    bot.run(token)
+log.info(f"Starting... token={len(TOKEN)}c dpy={discord.__version__}")
+try:
+    bot.run(TOKEN, log_handler=None)
+except Exception as e:
+    log.critical(f"CRASH: {e}")
+    import traceback; traceback.print_exc()
