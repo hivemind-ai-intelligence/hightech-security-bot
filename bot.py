@@ -1,33 +1,28 @@
-"""🦇 Hi-Tech Security — Minimal Discord Bot"""
-import os, sys, logging, asyncio
+"""🦇 Hi-Tech Security — No sync on startup"""
+import os, sys, logging
 import discord
 from discord.ext import commands
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import threading
 
-logging.basicConfig(level=logging.INFO, stream=sys.stdout, 
+logging.basicConfig(level=logging.INFO, stream=sys.stdout,
     format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("bot")
 
-# Health server (Render needs port binding)
 class H(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200); self.end_headers(); self.wfile.write(b"OK")
+    def do_GET(self): self.send_response(200); self.end_headers(); self.wfile.write(b"OK")
     def log_message(self, *a): pass
 
-PORT = int(os.getenv("PORT", "8080"))
-threading.Thread(target=lambda: HTTPServer(("0.0.0.0", PORT), H).serve_forever(), daemon=True).start()
-log.info(f"Health: :{PORT}")
+PORT = int(os.getenv("PORT","8080"))
+threading.Thread(target=lambda: HTTPServer(("0.0.0.0",PORT),H).serve_forever(), daemon=True).start()
 
-# Config
-TOKEN = os.getenv("DISCORD_BOT_TOKEN", "")
-PREFIX = os.getenv("BOT_PREFIX", "!")
-if not TOKEN:
-    log.critical("NO TOKEN!"); sys.exit(1)
+TOKEN = os.getenv("DISCORD_BOT_TOKEN","")
+PREFIX = os.getenv("BOT_PREFIX","!")
+if not TOKEN: log.critical("NO TOKEN!"); sys.exit(1)
 
 class Bot(commands.Bot):
     def __init__(self):
-        super().__init__(command_prefix=commands.when_mentioned_or(PREFIX), 
+        super().__init__(command_prefix=commands.when_mentioned_or(PREFIX),
                         intents=discord.Intents.all(), case_insensitive=True)
 
     async def setup_hook(self):
@@ -36,34 +31,14 @@ class Bot(commands.Bot):
                 "cogs.help","cogs.music","cogs.reports","cogs.backup","cogs.server_config"]
         ok=0
         for c in cogs:
-            try:
-                await self.load_extension(c)
-                ok+=1
-            except Exception as e:
-                log.error(f"Cog fail {c}: {e}")
-        log.info(f"Cogs: {ok}/{len(cogs)}")
-        try:
-            await self.tree.sync()
-            log.info(f"Synced {len(self.tree.get_commands())} cmds")
-        except Exception as e:
-            log.warning(f"Sync defer: {e}")
+            try: await self.load_extension(c); ok+=1
+            except Exception as e: log.error(f"{c}: {e}")
+        log.info(f"📦 {ok}/{len(cogs)} cogs loaded")
 
     async def on_ready(self):
-        log.info(f"ONLINE: {self.user} | {len(self.guilds)} guilds | {len(self.tree.get_commands())} cmds")
+        log.info(f"🦇 ONLINE: {self.user} | {len(self.guilds)} servers")
         await self.change_presence(activity=discord.Activity(
-            type=discord.ActivityType.watching, name=f"🦇 /bot_help"))
+            type=discord.ActivityType.watching, name="🦇 /bot_help"))
 
 bot = Bot()
-
-@bot.event
-async def on_connect(): log.info("WebSocket connected")
-
-@bot.event  
-async def on_disconnect(): log.warning("WebSocket disconnected")
-
-log.info(f"Starting bot... token={len(TOKEN)}chars discord.py={discord.__version__}")
-try:
-    bot.run(TOKEN, log_handler=None)
-except Exception as e:
-    log.critical(f"CRASH: {e}")
-    import traceback; traceback.print_exc()
+bot.run(TOKEN, log_handler=None)
