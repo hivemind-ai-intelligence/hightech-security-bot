@@ -9,17 +9,19 @@ logging.basicConfig(level=logging.INFO, stream=sys.stdout,
     format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("bot")
 
+# Health server (Render needs port binding)
 class H(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200); self.end_headers(); self.wfile.write(b"OK")
     def log_message(self, *a): pass
 
-PORT = int(os.getenv("PORT","8080"))
-threading.Thread(target=lambda: HTTPServer(("0.0.0.0",PORT),H).serve_forever(), daemon=True).start()
-log.info(f"Health :{PORT}")
+PORT = int(os.getenv("PORT", "8080"))
+threading.Thread(target=lambda: HTTPServer(("0.0.0.0", PORT), H).serve_forever(), daemon=True).start()
+log.info(f"Health: :{PORT}")
 
-TOKEN = os.getenv("DISCORD_BOT_TOKEN","")
-PREFIX = os.getenv("BOT_PREFIX","!")
+# Config
+TOKEN = os.getenv("DISCORD_BOT_TOKEN", "")
+PREFIX = os.getenv("BOT_PREFIX", "!")
 if not TOKEN:
     log.critical("NO TOKEN!"); sys.exit(1)
 
@@ -35,9 +37,10 @@ class Bot(commands.Bot):
         ok=0
         for c in cogs:
             try:
-                await self.load_extension(c); ok+=1
+                await self.load_extension(c)
+                ok+=1
             except Exception as e:
-                log.error(f"Cog {c}: {e}")
+                log.error(f"Cog fail {c}: {e}")
         log.info(f"Cogs: {ok}/{len(cogs)}")
         try:
             await self.tree.sync()
@@ -47,16 +50,18 @@ class Bot(commands.Bot):
 
     async def on_ready(self):
         log.info(f"ONLINE: {self.user} | {len(self.guilds)} guilds | {len(self.tree.get_commands())} cmds")
-        await self.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="🦇 /bot_help"))
+        await self.change_presence(activity=discord.Activity(
+            type=discord.ActivityType.watching, name=f"🦇 /bot_help"))
 
 bot = Bot()
 
 @bot.event
-async def on_connect(): log.info("WS connected")
-@bot.event
-async def on_disconnect(): log.warning("WS disconnected")
+async def on_connect(): log.info("WebSocket connected")
 
-log.info(f"Starting... token={len(TOKEN)}c dpy={discord.__version__}")
+@bot.event  
+async def on_disconnect(): log.warning("WebSocket disconnected")
+
+log.info(f"Starting bot... token={len(TOKEN)}chars discord.py={discord.__version__}")
 try:
     bot.run(TOKEN, log_handler=None)
 except Exception as e:
